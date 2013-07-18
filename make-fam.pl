@@ -1,4 +1,4 @@
-#!/tool/bin/perl
+#!/usr/bin/perl
 #
 # This script writes a .tex file which does the necessary work 
 # of converting Adobe Font Metric files for a `normal' font family,

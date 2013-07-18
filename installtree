@@ -1,4 +1,4 @@
-#!/tool/bin/perl
+#!/usr/bin/perl
 # copy PSNFSS tools CTAN output tree to a TDS tree
 use English;
 use Getopt::Long;

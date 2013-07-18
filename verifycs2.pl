@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/bin/perl
 
 # File:    verifycs.pl
 # Purpose: Perl script written to check consistency of psfonts on CTAN.

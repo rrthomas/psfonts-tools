@@ -1,4 +1,4 @@
-#!/tool/bin/perl
+#!/usr/bin/perl
 #
 # This script converts an Adobe Font Metric file for a special font to
 # TeX font metric, and installs it in a distribution directory. It uses
