@@ -1,0 +1,7 @@
+The program cs can read the checksum from any TFM, VF and PK file.
+It can also be used to compute a ps2pk compatible checksum for TeX
+PostScript fonts. The program is used in addchecksum, a perl-script that
+adds checksums to VPL files.
+
+Piet Tutelaers
+November 1995

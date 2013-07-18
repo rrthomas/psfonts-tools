@@ -1,0 +1,132 @@
+
+
+
+     CCCCSSSS((((1111))))                     UUUUNNNNIIIIXXXX SSSSyyyysssstttteeeemmmm VVVV                     CCCCSSSS((((1111))))
+
+
+
+     NNNNAAAAMMMMEEEE
+          cs - checksum for TeX fonts
+
+
+     SSSSYYYYNNNNOOOOPPPPSSSSIIIISSSS
+          cs [-o] TeXfont
+
+          cs [-o] [-e<file>] [-S<value>] [-E<value>] AFMfile
+
+     DDDDEEEESSSSCCCCRRRRIIIIPPPPTTTTIIIIOOOONNNN
+          This program can read checksums from existing TeX font files
+          (TFM, PK or VF). It can also compute the checksum for TeX
+          fonts that are used to cope with PostScript fonts in the
+          same manner as afm2tfm(1), as part of dvips version 5.487 or
+          higher, and ps2pk(1) do. In the case of a PostScript font,
+          the checksum will depend upon:
+               - the AFMfile (containing widths for all characters)
+               - the encoding vector (-e<file> or encoding used in AFMfile)
+               - the amount of extension used (-E<value>).
+
+          Slanting has no effect on the checksum because it does not
+          change the character box.
+
+     OOOOPPPPTTTTIIIIOOOONNNNSSSS
+          -o   Print checksum as an octal value.
+
+          -e<file>
+               The encoding scheme (default the encoding from the AFM
+               file).
+
+          -E<value>
+               The extension factor (real value, default 1.0).
+
+          -S<value>
+               The slant (real value, default 0.0).
+
+
+     EEEEXXXXAAAAMMMMPPPPLLLLEEEESSSS
+          cs -o cmr10.tfm
+
+          cs -o -eEC.enc Times-Roman.afm
+
+
+     SSSSEEEEEEEE AAAALLLLSSSSOOOO
+          afm2tfm(1), dvips(1), ps2pk(1)
+
+     VVVVEEEERRRRSSSSIIIIOOOONNNN
+          1.0 (Januari 1995)
+
+     AAAAUUUUTTTTHHHHOOOORRRR
+          Piet Tutelaers
+          rcpt@urc.tue.nl
+
+
+
+     Page 1                                          (printed 2/27/96)
+
+
+
+
+
+
+     CCCCSSSS((((1111))))                     UUUUNNNNIIIIXXXX SSSSyyyysssstttteeeemmmm VVVV                     CCCCSSSS((((1111))))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+     Page 2                                          (printed 2/27/96)
+
+
+
+
+
+

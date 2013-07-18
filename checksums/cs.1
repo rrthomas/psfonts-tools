@@ -1,0 +1,47 @@
+.TH CS 1
+.SH NAME
+cs \- checksum for TeX fonts
+
+.SH SYNOPSIS
+.nf
+cs [-o] TeXfont
+
+cs [-o] [-e<file>] [-S<value>] [-E<value>] AFMfile
+.SH DESCRIPTION
+This program can read checksums from existing TeX font files (TFM,
+PK or VF). It can also compute the checksum for TeX fonts that are
+used to cope with PostScript fonts in the same manner as afm2tfm(1),
+as part of dvips version 5.487 or higher, and ps2pk(1) do. In the
+case of a PostScript font, the checksum will depend upon:
+.RS
+.nf
+- the AFMfile (containing widths for all characters)
+- the encoding vector (-e<file> or encoding used in AFMfile)
+- the amount of extension used (-E<value>).
+.RE
+.PP
+Slanting has no effect on the checksum because it does not
+change the character box.
+.SH OPTIONS
+.IP "-o"
+Print checksum as an octal value.
+.IP "-e<file>"
+The encoding scheme (default the encoding from the AFM file).
+.IP "-E<value>"
+The extension factor (real value, default 1.0).
+.IP "-S<value>"
+The slant (real value, default 0.0).
+
+.SH EXAMPLES
+cs -o cmr10.tfm
+
+cs -o -eEC.enc Times-Roman.afm
+
+.SH SEE ALSO
+afm2tfm(1), dvips(1), ps2pk(1)
+.SH VERSION
+1.0 (Januari 1995)
+.SH AUTHOR
+.nf
+Piet Tutelaers
+rcpt@urc.tue.nl

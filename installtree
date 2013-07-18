@@ -1,0 +1,81 @@
+#!/tool/bin/perl
+# copy PSNFSS tools CTAN output tree to a TDS tree
+use English;
+use Getopt::Long;
+use File::Basename;
+use Cwd;
+
+$filedate="1998/05/12";
+$fileversion="1.0";
+
+$opt_debug=0;
+
+if (&IsWin32) {
+open(SH,"kpsewhich -separator=; -expand-path \$TEXMF |") 
+    || die "cannot run kpsewhich to read TEXMF"; 
+    $opt_texdir=<SH>;
+    chop $opt_texdir;
+    @dirs=split(/;/,$opt_texdir);
+ } 
+else 
+{ 
+open(SH,"kpsewhich -separator=: -expand-path '\$TEXMF' |") 
+    || die "cannot run kpsewhich to read TEXMF"; 
+    $opt_texdir=<SH>;
+    chop $opt_texdir;
+    @dirs=split(/:/,$opt_texdir);
+}
+close(SH); 
+$opt_texdir=$dirs[0];
+
+$result = GetOptions (
+"debug!",   
+"texdir=s", # TeX tree
+    );
+
+if ($result eq 0 ) {  die ("OPTION FAILURE"); }
+die "[installtree] Usage: installtree [options] fontdir \n" 
+    unless @ARGV > 0;
+
+$fontdir=$ARGV[0];
+
+chdir("$fontdir") || die ("cannot change directory to $fontdir");
+$base = getcwd();
+@d=split(/\//,$base); 
+$l=scalar(@d);
+$VENDOR=$d[$l-2];
+$FAMILY=$d[$l-1];
+open(README,"README");
+    while(<README>) {
+	if (/ \+ a file /) {
+	    ($FAMCODE) = /^ \+ a file ([a-z0-9]*)\.map.*/;
+            print "family code is $FAMCODE\n";
+	}
+}
+close README;
+print "install $fontdir in $opt_texdir, $VENDOR, $FAMILY\n";
+mkdir ("$opt_texdir/fonts",0777);
+mkdir ("$opt_texdir/fonts/vf",0777);
+mkdir ("$opt_texdir/fonts/tfm",0777);
+mkdir ("$opt_texdir/fonts/tfm/$VENDOR",0777);
+mkdir ("$opt_texdir/fonts/vf/$VENDOR",0777);
+mkdir ("$opt_texdir/fonts/tfm/$VENDOR/$FAMILY",0777);
+mkdir ("$opt_texdir/fonts/vf/$VENDOR/$FAMILY",0777);
+mkdir ("$opt_texdir/tex",0777);
+mkdir ("$opt_texdir/tex/latex",0777);
+mkdir ("$opt_texdir/tex/latex/psnfss",0777);
+mkdir ("$opt_texdir/tex/latex/psnfss/$FAMCODE",0777);
+mkdir ("$opt_texdir/dvips",0777);
+mkdir ("$opt_texdir/dvips/psnfss",0777);
+mkdir ("$opt_texdir/dvips/psnfss/$FAMCODE",0777);
+
+system("cp $base/vf/* $opt_texdir/fonts/vf/$VENDOR/$FAMILY");
+system("cp $base/tfm/* $opt_texdir/fonts/tfm/$VENDOR/$FAMILY");
+system("cp $base/tex/* $opt_texdir/tex/latex/psnfss/$FAMCODE");
+system("cp $base/dvips/* $opt_texdir/dvips/psnfss/$FAMCODE");
+
+sub IsWin32 {
+    return $^O =~ 'MSWin32';
+}
+
+1;

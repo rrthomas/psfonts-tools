@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+# This script takes a CTAN psfonts metrics tree, and copies the files
+# to a TDS tree.
+#
+# Sebastian Rahtz August 1995, January 1997
+#
+# Provide a usage message to refresh human memories.
+if test \( $# -lt 2 \) 
+then 
+  echo "Usage: ctan-to-cds CTANdirectory TDSdirectory"
+  echo "You must supply the name of the font directory you want to transform"
+   exit 1
+fi
+mkdir -p $2
+pushd $2
+DEST=`pwd`
+popd
+#
+pushd $1
+START=`pwd`
+VENDOR=`basename $START`
+echo Vendor: $VENDOR
+for i in *
+ do
+ cd $i
+ H=`pwd`
+ FAMILY=`basename $H`
+ echo Family: $FAMILY
+ mkdir -p $DEST/fonts/tfm/$VENDOR/$FAMILY
+ cp $START/$FAMILY/tfm/* $DEST/fonts/tfm/$VENDOR/$FAMILY
+
+ mkdir -p $DEST/fonts/vf/$VENDOR/$FAMILY
+ cp $START/$FAMILY/vf/* $DEST/fonts/vf/$VENDOR/$FAMILY
+
+ mkdir -p $DEST/tex/latex/psnfss
+ cp $START/$FAMILY/tex/* $DEST/tex/latex/psnfss
+
+ mkdir -p $DEST/dvips/psnfss
+ cp $START/$FAMILY/dvips/* $DEST/dvips/psnfss
+ cd ..
+done
+popd

@@ -1,0 +1,9 @@
+for i in adobe xadobe bh monotype xmonotype bitstream
+do
+ echo TESTING directories in $i
+ for j in ../$i/*
+ do
+  echo testing $j
+  verifycs $j
+ done
+done

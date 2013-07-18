@@ -1,0 +1,149 @@
+#!/usr/local/bin/perl
+
+# File:    verifycs
+# Purpose: Perl script written to check consistency of psfonts on CTAN.
+#          Adapt definition of TFMPATH to place where default TFM fonts are.
+# Author:  Piet Tutelaers (rcpt@urc.tue.nl)
+# Version: 1.0 (December 1995)
+
+$debug = 0;
+$TFMPATH = "/usr/local/tex-3.1415/fonts/tfm";
+
+die "Usage: verifycs fontdir\n" unless @ARGV == 1;
+
+$fontdir = $ARGV[0];
+
+die "$fontdir: no such directory\n" unless -r $fontdir;
+
+@tfms = split(/\s+/, `find $fontdir -name "*.tfm" -print`);
+
+# Loop through TFM files
+foreach (@tfms) {
+   print "Font: $_\n" if $debug;
+   ($dir, $font) = m#^(.*)/tfm/(.*)\.tfm$#;
+   if (-r "$dir/vf/$font.vf") { # Virtual font
+      # Verify checksums
+      chop($csvf  = `cs -o $dir/vf/$font.vf`);
+      chop($cstfm = `cs -o $dir/tfm/$font.tfm`);
+      if ("$csvf" ne "$cstfm") {
+         print "[1] $dir/{vf,tfm}/$font.*: checksum mismatch ($csvf,$cstfm)\n";
+         next;
+      }
+   
+      # Now verify fonts referenced in VF file
+      # We look for information of the form
+      #	(MAPFONT D 0
+      #	   (FONTNAME ptmr8r)
+      #	   (FONTCHECKSUM O 24364160751)
+      #	   (FONTAT R 1.0)
+      #	   (FONTDSIZE R 10.0)
+      #	   )
+      open(VF, "vftovp $dir/vf/$font.vf $dir/tfm/$font.tfm |");
+      while (<VF>) {
+         last if (/LIGTABLE/);
+         if (/MAPFONT/) {
+            $fontname =""; $checksum = "";
+            while (<VF>) {
+               ($fontname) = /FONTNAME\s+(\w+)/ if /FONTNAME/;
+               ($checksum) = /FONTCHECKSUM\s+O\s+(\w+)/ if /FONTCHECKSUM/;
+               last if /^\s+\)/;
+            }
+            if ("$checksum" ne "") {
+	       $tfmfile = &psearch("$dir/..//tfm:$TFMPATH", "$fontname.tfm");
+   	       if ("$tfmfile" eq "") {
+                  print "[2] $dir/vf/$font.vf: $fontname referenced\n";
+   	          next;
+   	       }
+               chop($cstfm = `cs -o $tfmfile`);
+   	       if ("$checksum" ne "$cstfm") {
+                  print "[3] $dir/vf/$font.vf: checksum mismatch $fontname against $tfmfile ",
+			"($checksum,$cstfm)\n";
+   	          next;
+   	       }
+   	       next;
+            }
+            print "[4]$dir/vf/$font.vf: no checksum for mapfont ($fontname)\n";
+         }
+      }
+      close(VF);
+   }
+   else { # Raw font
+      @lines = `grep "$font\[^a-z\]" $dir/../*/dvips/*.map 2>/dev/null`;
+      if (@lines == 0) {
+         print "[5] No mapping information for $font!\n";
+	 next;
+      }
+      chop($line = $lines[0]);
+      $line =~ s/^.*://;
+      print "line = $line\n" if $debug;
+      ($psname) = ($line =~ /[ *]*\S+\s+(\S+)/);
+      ($enc) = ($line =~ /^.*<(.*\.enc)/);
+      ($extend) = ($line =~ /.*[^\d.]([0-9.]+)\s+ExtendFont/);
+      ($slant) =  ($line =~ /.*[^\d.]([0-9.]+)\s+SlantFont/);
+
+      $args = "-n -o ";
+      $args .= "-e$enc " if $enc;
+      $args .= "-E$extend " if $extend;
+      $args .= "-S$slant " if $slant;
+
+      @afms = `grep -l \"FontName $psname\$\" $dir/../*/afm/*.afm 2>/dev/null`;
+      print "@afms" if $debug;
+      if (@afms == 0) {
+	 print "no AFM file for $font ($psname)\n";
+	 next;
+      }
+      chop($afm = $afms[0]);
+
+      print "cs $args $afm\n" if $debug;
+      $cs = 0;
+      chop($cs = `cs $args $afm`);
+      die "cs: exit code ", ($? >>8) & 255, "\n" if $cs == 0 && $?;
+   
+      chop($cstfm = `cs -o $dir/tfm/$font.tfm`);
+      print "[6]$dir/tfm/$font.tfm ($cstfm): checksum incorrect ($cs)\n"
+	 unless "$cstfm" eq "$cs";
+   }
+}
+
+#
+# Next function returns the name of the file in the path or empty string
+# when not available.
+#
+sub psearch {
+   local($path, $filename) = @_;
+   local($file, $subdir, @subdirectories);
+   local($firstdir, $lastdir);
+
+   # Loop through $path directories to find $filename
+   foreach (split(/:/, $path)) {
+      if (! m,//,) {
+         return "$_/$filename" if -r "$_/$filename";
+      }
+      elsif (m,//$,) { s,//$,,;
+         opendir(DIR, $_);
+         @subdirectories=readdir(DIR);
+         closedir(DIR);
+         foreach $subdir (@subdirectories) {
+            next if ($subdir eq '.' || $subdir eq '..');
+            next unless -d "$_/$subdir";
+print "Looking for $filename in $firstdir/$subdir/$lastdir\n" if $debug;
+            $file = &psearch("$_/$subdir", $filename);
+            return $file unless $file eq '';
+         }
+      }
+      elsif (m,//,) {
+         ($firstdir, $lastdir) = m,^(.*)//(.*)$,;
+         opendir(DIR, $firstdir);
+         @subdirectories=readdir(DIR);
+         closedir(DIR);
+         foreach $subdir (@subdirectories) {
+            next if ($subdir eq '.' || $subdir eq '..');
+            next unless -d "$firstdir/$subdir";
+print "Looking for $filename in $firstdir/$subdir/$lastdir\n" if $debug;
+            $file = &psearch("$firstdir/$subdir/$lastdir", $filename);
+            return $file unless $file eq '';
+         }
+      }
+   }
+   return "";
+}

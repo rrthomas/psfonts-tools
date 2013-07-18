@@ -1,0 +1,23 @@
+This directory contains the working scripts needed to make
+the font metrics which form the CTAN fonts/psfonts directory.
+
+These scripts were originally Unix shell scripts.  Many changes to the
+scripts were made with Piet to get proper checksums in the fonts, and
+make the system more understandable and reliable. They were then
+converted to Perl in January 1997 as part of a radical revision, and
+they are now hopefully useable. There should be almost no
+Unix-dependent material here.
+
+The makefile gives examples of their usage, or you
+can start reading make-fam.pl, most of whose work is done
+by subroutines in famtool.pl.
+
+Volunteers to turn this into a serious Perl tool, and to
+document it, are very welcome!
+
+Sebastian Rahtz <s.rahtz@elsevier.co.uk>
+Piet Tutelaers
+December 1995
+
+Sebastian Rahtz
+January/February 1997; September 1997; July 1998

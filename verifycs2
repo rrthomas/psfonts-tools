@@ -1,0 +1,113 @@
+#!/usr/local/bin/perl
+
+# File:    verifycs
+# Purpose: Perl script written to check consistency of psfonts on CTAN.
+#          Adapt definition of TFMPATH to place where default TFM fonts are.
+# Author:  Piet Tutelaers (rcpt@urc.tue.nl)
+# Version: 1.0 (December 1995), 2.0 (January 1997) by S Rahtz
+#          3.0 (May 1998) for web2c 7.2
+#
+$debug = 0;
+
+die "Usage: verifycs fontdir\n" unless @ARGV == 1;
+
+$fontdir = $ARGV[0];
+
+die "$fontdir: no such directory\n" unless -r $fontdir;
+
+$ENV{TFMFONTS}="$fontdir//tfm";
+$ENV{VFFONTS}="$fontdir//vf";
+@tfms = split(/\s+/, `find $fontdir -name "*.tfm" -print`);
+
+# Loop through TFM files
+foreach (@tfms) {
+   print "Font: $_\n" if $debug;
+   ($dir, $font) = m#^(.*)/tfm/(.*)\.tfm$#;
+   if (-r "$dir/vf/$font.vf") { # Virtual font
+      # Verify checksums
+      chop($csvf  = `cs -o $dir/vf/$font.vf`);
+      chop($cstfm = `cs -o $dir/tfm/$font.tfm`);
+      if ("$csvf" ne "$cstfm") {
+         print "[1] $dir/{vf,tfm}/$font.*: checksum mismatch ($csvf,$cstfm)\n";
+         next;
+      }
+   
+      # Now verify fonts referenced in VF file
+      # We look for information of the form
+      #	(MAPFONT D 0
+      #	   (FONTNAME ptmr8r)
+      #	   (FONTCHECKSUM O 24364160751)
+      #	   (FONTAT R 1.0)
+      #	   (FONTDSIZE R 10.0)
+      #	   )
+      open(VF, "vftovp $dir/vf/$font.vf $dir/tfm/$font.tfm |");
+      while (<VF>) {
+         last if (/LIGTABLE/);
+         if (/MAPFONT/) {
+            $fontname =""; $checksum = "";
+            while (<VF>) {
+               ($fontname) = /FONTNAME\s+(\w+)/ if /FONTNAME/;
+               ($checksum) = /FONTCHECKSUM\s+O\s+(\w+)/ if /FONTCHECKSUM/;
+               last if /^\s+\)/;
+            }
+            if ("$checksum" ne "") {
+	       $tfmfile = `kpsewhich $fontname.tfm 2> /dev/null`;
+   	       if ($tfmfile eq "") {
+                  print "[2] $dir/vf/$font.vf: $fontname referenced\n";
+   	          next;
+   	       }
+               chop($cstfm = `cs -o $tfmfile`);
+   	       if ("$checksum" ne "$cstfm") {
+                  print "[3] $dir/vf/$font.vf: checksum mismatch $fontname against $tfmfile ",
+			"($checksum,$cstfm)\n";
+   	          next;
+   	       }
+   	       next;
+            }
+            print "[4]$dir/vf/$font.vf: no checksum for mapfont ($fontname)\n";
+         }
+      }
+      close(VF);
+   }
+   else { # Raw font
+      @lines = `grep "$font\[^a-z\]" $dir/../*/dvips/*.map 2>/dev/null`;
+      if (@lines == 0) {
+         print "[5] No mapping information for $font!\n";
+	 next;
+      }
+      chop($line = $lines[0]);
+      $line =~ s/^.*://;
+      print "line = $line\n" if $debug;
+      ($psname) = ($line =~ /[ *]*\S+\s+(\S+)/);
+      ($enc) = ($line =~ /^.*<(.*\.enc)/);
+      ($extend) = ($line =~ /.*[^\d.]([0-9.]+)\s+ExtendFont/);
+      ($slant) =  ($line =~ /.*[^\d.]([0-9.]+)\s+SlantFont/);
+
+      $args = "-n -o ";
+if ($enc) 
+{
+$EncFile=`kpsewhich -format='dvips config' $enc `;
+chop($EncFile);
+     $args .= "-e$EncFile " 
+     }
+      $args .= "-E$extend " if $extend;
+      $args .= "-S$slant " if $slant;
+      $findafm=$font;
+      $findafm =~ s/8r/8a/;
+      chop($afm = `kpsewhich  $findafm.afm 2> /dev/null`);
+      if ($afm ne "")
+      {
+      print "cs $args $afm\n" if $debug;
+      $cs = 0;
+      chop($cs = `cs $args $afm`);
+      die "cs: exit code ", ($? >>8) & 255, "\n" if $cs == 0 && $?;
+   
+      chop($cstfm = `cs -o $dir/tfm/$font.tfm`);
+      print "[6] $dir/tfm/$font.tfm ($cstfm): checksum incorrect ($cs)\n"
+	 unless "$cstfm" eq "$cs";
+  }
+   else
+   { print "no AFM file for $font, cannot proceed\n"; }
+   }
+}
+

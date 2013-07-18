@@ -1,0 +1,202 @@
+#!/usr/local/bin/perl
+
+# Add checksum to VPL files for all referenced FONTNAME's
+#
+# Example:
+#    addchecksum mapfile file[.vpl] ...
+#
+# Author:  Piet Tutelaers (rcpt@urc.tue.nl)
+# Version: Nov. 1995
+
+$PATHSEP = ':';
+$debug = 1;
+$verbose = 1;
+
+die "[addchecksum] Usage: addchecksum mapfile file[.vpl] ...\n" unless @ARGV > 1;
+
+# Check required tools
+foreach $tool ('cs', 'vptovf', 'pltotf', 'ls') {
+   die "[addchecksum] $tool not found in $ENV{'PATH'}" unless &where($tool);
+}
+
+# Print everything in order ...
+select(STDOUT); $| = 1;
+
+$mapfile = $ARGV[0];
+die "[addchecksum] $mapfile: can not read" unless -r $mapfile;
+shift;
+
+foreach (@ARGV) {
+   s/\.(vpl|VPL)//;
+   $font = $_;
+   next if $font eq "tmp";
+   if (-r "$font.vf") {
+      print "$font.vpl: skipped ($font.vf available)\n" if $verbose;
+      next;
+   }
+
+   die "[addchecksum] Can not open $font.vpl\n" unless open(VPL, "<$font.vpl");
+
+   print "Processing $font.vpl\n" if $verbose;
+   open(TMPVPL, ">tmp.vpl");
+   print TMPVPL "(COMMENT new FONTCHECKSUMs added)\n";
+   while (<VPL>) {
+      $vpl = $_;
+      next if (/FONTCHECKSUM/);
+      if (/FONTNAME/) {
+         $offset = index($vpl, "FONTNAME");
+         $offset = index($vpl, ")", $offset);
+         die "[addchecksum] Expected a closing brace after FONTNAME in line:",
+             "\n$vpl" if $offset == -1;
+         ($fontname) =  ($vpl =~ /FONTNAME\s+(\w+)/);
+         $cs = 0;
+         if (-r "$fontname.tfm") {
+            chop($cs = `cs -o "$fontname.tfm"`);
+         }
+         elsif (-r "$fontname.pl") {
+            &make_tfm($fontname);
+	    die "[addchecksum] $fontname: invalid checksum" unless $cs != 0;
+         }
+         else {
+            die "[addchecksum] No font for $fontname\n";
+         }
+         die "[addchecksum] cs: exit code ", ($? >>8) & 255, "\n" if $cs == 0 && $?;
+         substr($vpl, $offset+1, 0) = " (FONTCHECKSUM O $cs) ";
+      }
+      print TMPVPL $vpl;
+   }
+   close(VPL); close(TMPVPL);
+   unlink("$font.vpl");
+   rename("tmp.vpl", "$font.vpl");
+   print "vptovf $font.vpl $font.vf $font.tfm\n";
+   system("vptovf $font.vpl $font.vf $font.tfm");
+   die "[addchecksum] vptovf: exit code ", ($? >>8) & 255, "\n" if $?;
+}
+
+# Add CHECKSUM in the same way as AFM2TFM and PS2PK did!
+sub make_tfm {
+   local($texname) = @_;
+   local($line, $psname, $enc, $extend, $slant, $afmfile); 
+   local($csadded) = 0;
+
+   chop($line = `grep "$texname " $mapfile`);
+   die "[addchecksum] No mapping information for $texname!\n" if "$line" eq "";
+   $line =~ s/^.*://;
+
+   print "Using for $texname '$line'\n" if $verbose;
+   ($psname) = ($line =~ /[ *]*\S+\s+(\S+)/);
+   ($enc) = ($line =~ /^.*<(.*\.enc)/);
+   ($extend) = ($line =~ /.*[^\d.]([0-9.]+)\s+ExtendFont/);
+   ($slant) =  ($line =~ /.*[^\d.]([0-9.]+)\s+SlantFont/);
+
+   $afmfile = &findafm($psname, '.');
+   die "[addchecksum] No AFM file for $psname\n" if "$afmfile" eq "";
+
+   print "Using AFM file $afmfile ($psname) for $texname\n" if $verbose;
+
+   $args = "-n -o ";
+   $args .= "-e$enc " if $enc;
+   $args .= "-E$extend " if $extend;
+   $args .= "-S$slant " if $slant;
+   print "cs $args $afmfile\n";
+   $cs = 0;
+   chop($cs = `cs $args $afmfile`);
+   die "[addchecksum] cs: exit code ", ($? >>8) & 255, "\n" if $cs == 0 && $?;
+
+   die "[addchecksum] Wrong checksum for $texname\n" if "$cs" eq "";
+   print "$texname.pl: checksum $cs (octal)\n" if $verbose;
+
+   die "[addchecksum] Can not open $texname.pl\n" unless open(PL, "<$texname.pl");
+   open(TMPPL, ">tmp.pl");
+   print TMPPL "(COMMENT new CHECKSUM added)\n";
+   while (<PL>) {
+      if (/CHECKSUM/) {
+         print TMPPL "(CHECKSUM O $cs)\n";
+	 $csadded = 1;
+	 next;
+      }
+      if ($csadded == 0 && /FONTDIMEN/) {
+         print TMPPL "(CHECKSUM O $cs)\n";
+	 $csadded = 1;
+      }
+      print TMPPL;
+   }
+   close(PL); close(TMPPL);
+   unlink("$fontname.pl");
+   rename("tmp.pl", "$fontname.pl");
+   print "pltotf $fontname.pl $fontname.tfm\n";
+   system("pltotf $fontname.pl $fontname.tfm");
+   die "[addchecksum] pltotf: exit code ", ($? >>8) & 255, "\n" if $?;
+}
+
+#
+# Next function returns the name of the file containing the wanted
+# PostScript font <afmname> or an empty string if the font is not found
+# in <afmfontpath>.
+#
+sub findafm {
+   local($afmname, $afmfontpath) = @_;
+   local($afmfname, $afmfile, $subdir, @subdirectories);
+   local($firstdir, $lastdir);
+
+   # Loop through $afmfontpath directories to see if we have one
+   foreach (split(/$PATHSEP/, $afmfontpath)) {
+      if (m,//$,) { s,//$,,;
+         opendir(DIR, $_);
+         @subdirectories=readdir(DIR);
+         closedir(DIR);
+         foreach $subdir (@subdirectories) {
+            next if ($subdir eq '.' || $subdir eq '..');
+            next unless -d "$_/$subdir";
+print "Looking for $afmname in $firstdir/$subdir/$lastdir\n" if $verbose;
+            $afmfile = &findafm($afmname, "$_/$subdir");
+            return $afmfile unless $afmfile eq '';
+         }
+         return "";
+      }
+      elsif (m,//,) {
+         ($firstdir, $lastdir) = m,^(.*)//(.*)$,;
+         opendir(DIR, $firstdir);
+         @subdirectories=readdir(DIR);
+         closedir(DIR);
+         foreach $subdir (@subdirectories) {
+            next if ($subdir eq '.' || $subdir eq '..');
+            next unless -d "$firstdir/$subdir";
+print "looking for $afmname in $firstdir/$subdir/$lastdir\n" if $debug;
+            $afmfile = &findafm($afmname, "$firstdir/$subdir/$lastdir");
+            return $afmfile unless $afmfile eq '';
+         }
+         return "";
+      }
+      next unless -d "$_";
+      opendir(DIR, "$_");
+      @fontfiles=readdir(DIR);
+      closedir(DIR);
+      foreach $font (@fontfiles) {
+         next if ($font eq '.' || $font eq '..');
+         next unless $font =~ m#\.afm$#;
+         $afmfile = "$_/$font"; 
+print "looking for $afmname in $afmfile\n" if $debug;
+         chop($afmfname = `grep FontName $afmfile`);
+         $afmfname =~ s/FontName //;
+print "$afmfname in $afmfile\n" if $debug;
+print "found $afmfname in $afmfile\n" if $debug && $afmfname eq $afmname;
+         return $afmfile if $afmfname eq $afmname;
+      }
+   }
+   return "";
+}
+
+#
+# Look for a <program> in $ENV{'PATH'}. Return absolute name of <program>
+# when <program> is found and is executable otherwise return empty string.
+#
+sub where {
+   local($prog) = @_;
+   foreach (split(/$PATHSEP/, $ENV{'PATH'})) {
+      if (-x "$_/$prog") {
+         return "$_/$prog";
+      }
+   }
+   return "";
+}
